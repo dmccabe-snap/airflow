@@ -17,8 +17,11 @@
 # specific language governing permissions and limitations
 # under the License.
 
-import signal
+import ctypes
 import os
+import signal
+import threading
+import time
 
 from airflow.exceptions import AirflowTaskTimeout
 from airflow.utils.log.logging_mixin import LoggingMixin
@@ -32,22 +35,53 @@ class timeout(LoggingMixin):
     def __init__(self, seconds=1, error_message='Timeout'):
         self.seconds = seconds
         self.error_message = error_message + ', PID: ' + str(os.getpid())
+        self._finished = False
+        self._timeout_end = None
+        self._main_thread_id = None
+        self._timeout_cv = None
+        self._timeout_thread = None
 
     def handle_timeout(self, signum, frame):
         self.log.error("Process timed out, PID: %s", str(os.getpid()))
         raise AirflowTaskTimeout(self.error_message)
 
     def __enter__(self):
-        try:
-            signal.signal(signal.SIGALRM, self.handle_timeout)
-            signal.alarm(self.seconds)
-        except ValueError as e:
-            self.log.warning("timeout can't be used in the current context")
-            self.log.exception(e)
+        if 'alarm' in signal.__dict__:
+            try:
+                signal.signal(signal.SIGALRM, self.handle_timeout)
+                signal.alarm(self.seconds)
+            except ValueError as e:
+                self.log.warning("timeout can't be used in the current context")
+                self.log.exception(e)
+        else:
+            # Windows does not have SIGALRM, so fake it with a thread and an async exception
+            self._finished = False
+            self._timeout_end = time.time() + self.seconds
+            self._main_thread_id = threading.get_ident()
+            self._timeout_cv = threading.Condition()
+            self._timeout_thread = threading.Thread(target=self._wait_for_timeout)
+            self._timeout_thread.start()
 
     def __exit__(self, type, value, traceback):
-        try:
-            signal.alarm(0)
-        except ValueError as e:
-            self.log.warning("timeout can't be used in the current context")
-            self.log.exception(e)
+        if self._timeout_thread:
+            with self._timeout_cv:
+                self._finished = True
+                self._timeout_cv.notify()
+            self._timeout_thread.join()
+        else:
+            try:
+                signal.alarm(0)
+            except ValueError as e:
+                self.log.warning("timeout can't be used in the current context")
+                self.log.exception(e)
+
+    def _wait_for_timeout(self):
+        with self._timeout_cv:
+            while not self._finished:
+                time_remaining = self._timeout_end - time.time()
+                if time_remaining < 0:
+                    self.log.error("Process timed out, PID: %s", str(os.getpid()))
+                    ctypes.pythonapi.PyThreadState_SetAsyncExc(
+                        self._main_thread_id, ctypes.py_object(AirflowTaskTimeout(self.error_message)))
+                    break
+                self._timeout_cv.wait(time_remaining)
