@@ -17,6 +17,7 @@
 # specific language governing permissions and limitations
 # under the License.
 
+import os
 import unittest
 from unittest import mock
 
@@ -33,8 +34,12 @@ class TestLocalExecutor(unittest.TestCase):
         executor.start()
 
         success_key = 'success {}'
-        success_command = ['true', 'some_parameter']
-        fail_command = ['false', 'some_parameter']
+        if os.name == 'nt':
+            success_command = ['cmd.exe', '/c', 'exit', '0']
+            fail_command = ['cmd.exe', '/c', 'exit', '1']
+        else:
+            success_command = ['true', 'some_parameter']
+            fail_command = ['false', 'some_parameter']
         self.assertTrue(executor.result_queue.empty())
 
         for i in range(self.TEST_SUCCESS_COMMANDS):

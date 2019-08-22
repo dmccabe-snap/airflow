@@ -18,6 +18,7 @@
 # under the License.
 
 import io
+from os import normpath
 import unittest
 
 from airflow import AirflowException
@@ -342,7 +343,7 @@ class TestSparkSubmitHook(unittest.TestCase):
                                      "spark_home": "/opt/myspark",
                                      "namespace": 'default'}
         self.assertEqual(connection, expected_spark_connection)
-        self.assertEqual(cmd[0], '/opt/myspark/bin/spark-submit')
+        self.assertEqual(normpath(cmd[0]), normpath('/opt/myspark/bin/spark-submit'))
 
     def test_resolve_connection_spark_home_not_set_connection(self):
         # Given
@@ -433,7 +434,7 @@ class TestSparkSubmitHook(unittest.TestCase):
                                      "spark_home": "/path/to/spark_home",
                                      "namespace": 'default'}
         self.assertEqual(connection, expected_spark_connection)
-        self.assertEqual(cmd[0], '/path/to/spark_home/bin/custom-spark-submit')
+        self.assertEqual(normpath(cmd[0]), normpath('/path/to/spark_home/bin/custom-spark-submit'))
 
     def test_resolve_connection_spark_standalone_cluster_connection(self):
         # Given
@@ -451,7 +452,7 @@ class TestSparkSubmitHook(unittest.TestCase):
                                      "spark_home": "/path/to/spark_home",
                                      "namespace": 'default'}
         self.assertEqual(connection, expected_spark_connection)
-        self.assertEqual(cmd[0], '/path/to/spark_home/bin/spark-submit')
+        self.assertEqual(normpath(cmd[0]), normpath('/path/to/spark_home/bin/spark-submit'))
 
     def test_resolve_spark_submit_env_vars_standalone_client_mode(self):
         # Given
@@ -643,7 +644,7 @@ class TestSparkSubmitHook(unittest.TestCase):
         kill_cmd = hook._build_spark_driver_kill_command()
 
         # Then
-        self.assertEqual(kill_cmd[0], '/path/to/spark_home/bin/spark-submit')
+        self.assertEqual(normpath(kill_cmd[0]), normpath('/path/to/spark_home/bin/spark-submit'))
         self.assertEqual(kill_cmd[1], '--master')
         self.assertEqual(kill_cmd[2], 'spark://spark-standalone-master:6066')
         self.assertEqual(kill_cmd[3], '--kill')

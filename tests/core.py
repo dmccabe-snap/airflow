@@ -1248,6 +1248,7 @@ class TestCli(unittest.TestCase):
         try:
             f.write(json_file_content.encode())
             f.flush()
+            f.close()
 
             args = self.parser.parse_args([
                 'users', 'import', f.name
@@ -1258,6 +1259,7 @@ class TestCli(unittest.TestCase):
 
     def _export_users_to_file(self):
         f = NamedTemporaryFile(delete=False)
+        f.close()
         args = self.parser.parse_args([
             'users', 'export', f.name
         ])
@@ -1663,7 +1665,9 @@ class TestCli(unittest.TestCase):
             cli.get_dags(self.parser.parse_args(['tasks', 'clear', 'foobar', '-dx', '-c']))
 
     def test_process_subdir_path_with_placeholder(self):
-        self.assertEqual(os.path.join(settings.DAGS_FOLDER, 'abc'), cli.process_subdir('DAGS_FOLDER/abc'))
+        self.assertEqual(
+            os.path.normpath(os.path.join(settings.DAGS_FOLDER, 'abc')),
+            os.path.normpath(cli.process_subdir('DAGS_FOLDER/abc')))
 
     def test_trigger_dag(self):
         cli.trigger_dag(self.parser.parse_args([

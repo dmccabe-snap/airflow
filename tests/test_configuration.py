@@ -19,6 +19,7 @@
 
 import contextlib
 import os
+import os.path
 import warnings
 from collections import OrderedDict
 
@@ -74,8 +75,8 @@ class TestConf(unittest.TestCase):
     def test_airflow_config_default(self):
         with env_vars(AIRFLOW_CONFIG=None):
             self.assertEqual(
-                configuration.get_airflow_config('/home/airflow'),
-                configuration.expand_env_var('/home/airflow/airflow.cfg'))
+                os.path.normpath(configuration.get_airflow_config('/home/airflow')),
+                os.path.normpath(configuration.expand_env_var('/home/airflow/airflow.cfg')))
 
     def test_airflow_config_override(self):
         with env_vars(AIRFLOW_CONFIG='/path/to/airflow/airflow.cfg'):

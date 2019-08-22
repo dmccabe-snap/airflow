@@ -51,7 +51,8 @@ class TestHelpers(unittest.TestCase):
     def _parent_of_ignores_sigterm(parent_pid, child_pid, setup_done):
         def signal_handler(unused_signum, unused_frame):
             pass
-        os.setsid()
+        if 'setsid' in os.__dict__:
+            os.setsid()
         signal.signal(signal.SIGTERM, signal_handler)
         child_setup_done = multiprocessing.Semaphore(0)
         child = multiprocessing.Process(target=TestHelpers._ignores_sigterm,
