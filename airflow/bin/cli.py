@@ -38,8 +38,6 @@ from airflow.utils.timezone import parse as parsedate
 import json
 from tabulate import tabulate
 
-import daemon
-from daemon.pidfile import TimeoutPIDLockFile
 import signal
 import sys
 import threading
@@ -890,6 +888,10 @@ def restart_workers(gunicorn_master_proc, num_workers_expected, master_timeout):
 
 @cli_utils.action_logging
 def webserver(args):
+    if os.name == 'nt':
+        # gunicorn is not supported on Windows at all (https://github.com/benoitc/gunicorn/issues/524)
+        raise AirflowException('airflow webserver is not supported on Windows')
+
     print(settings.HEADER)
 
     access_logfile = args.access_logfile or conf.get('webserver', 'access_logfile')
@@ -984,8 +986,8 @@ def webserver(args):
 
         if args.daemon:
             base, ext = os.path.splitext(pid)
-            ctx = daemon.DaemonContext(
-                pidfile=TimeoutPIDLockFile(base + "-monitor" + ext, -1),
+            ctx = _create_daemon(
+                base + "-monitor" + ext,
                 files_preserve=[handle],
                 stdout=stdout,
                 stderr=stderr,
@@ -1032,6 +1034,9 @@ def scheduler(args):
         do_pickle=args.do_pickle)
 
     if args.daemon:
+        if os.name == 'nt':
+            raise AirflowException('airflow scheduler daemon is not supported on Windows')
+
         pid, stdout, stderr, log_file = setup_locations("scheduler",
                                                         args.pid,
                                                         args.stdout,
@@ -1041,8 +1046,8 @@ def scheduler(args):
         stdout = open(stdout, 'w+')
         stderr = open(stderr, 'w+')
 
-        ctx = daemon.DaemonContext(
-            pidfile=TimeoutPIDLockFile(pid, -1),
+        ctx = _create_daemon(
+            pid,
             files_preserve=[handle],
             stdout=stdout,
             stderr=stderr,
@@ -1055,7 +1060,8 @@ def scheduler(args):
     else:
         signal.signal(signal.SIGINT, sigint_handler)
         signal.signal(signal.SIGTERM, sigint_handler)
-        signal.signal(signal.SIGQUIT, sigquit_handler)
+        if 'SIGQUIT' in signal.__dict__:
+            signal.signal(signal.SIGQUIT, sigquit_handler)
         job.run()
 
 
@@ -1110,6 +1116,9 @@ def worker(args):
         options["pool"] = conf.get("celery", "pool")
 
     if args.daemon:
+        if os.name == 'nt':
+            raise AirflowException('airflow Celery worker daemon is not supported on Windows')
+
         pid, stdout, stderr, log_file = setup_locations("worker",
                                                         args.pid,
                                                         args.stdout,
@@ -1119,8 +1128,8 @@ def worker(args):
         stdout = open(stdout, 'w+')
         stderr = open(stderr, 'w+')
 
-        ctx = daemon.DaemonContext(
-            pidfile=TimeoutPIDLockFile(pid, -1),
+        ctx = _create_daemon(
+            pid,
             files_preserve=[handle],
             stdout=stdout,
             stderr=stderr,
@@ -1291,12 +1300,15 @@ def flower(args):
         flower_conf = '--conf=' + args.flower_conf
 
     if args.daemon:
+        if os.name == 'nt':
+            raise AirflowException('airflow flower daemon is not supported on Windows')
+
         pid, stdout, stderr, _ = setup_locations("flower", args.pid, args.stdout, args.stderr, args.log_file)
         stdout = open(stdout, 'w+')
         stderr = open(stderr, 'w+')
 
-        ctx = daemon.DaemonContext(
-            pidfile=TimeoutPIDLockFile(pid, -1),
+        ctx = _create_daemon(
+            pid,
             stdout=stdout,
             stderr=stderr,
         )
@@ -1321,14 +1333,17 @@ def kerberos(args):
     import airflow.security.kerberos
 
     if args.daemon:
+        if os.name == 'nt':
+            raise AirflowException('airflow kerberos daemon is not supported on Windows')
+
         pid, stdout, stderr, _ = setup_locations(
             "kerberos", args.pid, args.stdout, args.stderr, args.log_file
         )
         stdout = open(stdout, 'w+')
         stderr = open(stderr, 'w+')
 
-        ctx = daemon.DaemonContext(
-            pidfile=TimeoutPIDLockFile(pid, -1),
+        ctx = _create_daemon(
+            pid,
             stdout=stdout,
             stderr=stderr,
         )
@@ -2550,6 +2565,14 @@ class CLIFactory:
 
 def get_parser():
     return CLIFactory.get_parser()
+
+
+def _create_daemon(lock_file_path, *args, **kwargs):
+    if os.name == 'nt':
+        raise RuntimeError('Daemon processes are not currently supported on Windows.')
+    import daemon
+    from daemon.pidfile import TimeoutPIDLockFile
+    return daemon.DaemonContext(pidfile=TimeoutPIDLockFile(lock_file_path, -1), *args, **kwargs)
 
 
 def main():

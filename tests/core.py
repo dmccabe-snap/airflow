@@ -1853,6 +1853,7 @@ class TestCli(unittest.TestCase):
             except Exception:
                 sleep(1)
 
+    @unittest.skipIf(os.name == "nt", "Skipping webserver test not supported on Windows")
     def test_cli_webserver_foreground(self):
         # Confirm that webserver hasn't been launched.
         # pgrep returns exit status 1 if no process matched.
@@ -1868,6 +1869,7 @@ class TestCli(unittest.TestCase):
         self.assertEqual(1, subprocess.Popen(["pgrep", "-c", "airflow"]).wait())
         self.assertEqual(1, subprocess.Popen(["pgrep", "-c", "gunicorn"]).wait())
 
+    @unittest.skipIf(os.name == "nt", "Skipping webserver test not supported on Windows")
     @unittest.skipIf("TRAVIS" in os.environ and bool(os.environ["TRAVIS"]),
                      "Skipping test due to lack of required file permission")
     def test_cli_webserver_foreground_with_pid(self):
@@ -1882,6 +1884,7 @@ class TestCli(unittest.TestCase):
         p.terminate()
         p.wait()
 
+    @unittest.skipIf(os.name == "nt", "Skipping webserver test not supported on Windows")
     @unittest.skipIf("TRAVIS" in os.environ and bool(os.environ["TRAVIS"]),
                      "Skipping test due to lack of required file permission")
     def test_cli_webserver_background(self):
@@ -1912,6 +1915,7 @@ class TestCli(unittest.TestCase):
         self.assertEqual(1, subprocess.Popen(["pgrep", "-c", "gunicorn"]).wait())
 
     # Patch for causing webserver timeout
+    @unittest.skipIf(os.name == "nt", "Skipping webserver test not supported on Windows")
     @mock.patch("airflow.bin.cli.get_num_workers_running", return_value=0)
     def test_cli_webserver_shutdown_when_gunicorn_master_is_killed(self, _):
         # Shorten timeout so that this test doesn't take too long time
