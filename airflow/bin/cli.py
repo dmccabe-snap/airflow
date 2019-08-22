@@ -2550,3 +2550,16 @@ class CLIFactory:
 
 def get_parser():
     return CLIFactory.get_parser()
+
+
+def main():
+    import argcomplete
+
+    if conf.conf.get("core", "security") == 'kerberos':
+        os.environ['KRB5CCNAME'] = conf.conf.get('kerberos', 'ccache')
+        os.environ['KRB5_KTNAME'] = conf.conf.get('kerberos', 'keytab')
+
+    parser = get_parser()
+    argcomplete.autocomplete(parser)
+    args = parser.parse_args()
+    args.func(args)
