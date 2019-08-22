@@ -356,7 +356,7 @@ class PythonVirtualenvOperator(PythonOperator):
         cmd = ['virtualenv', tmp_dir]
         if self.system_site_packages:
             cmd.append('--system-site-packages')
-        if self.python_version is not None:
+        if os.name != 'nt' and self.python_version is not None:
             cmd.append('--python=python{}'.format(self.python_version))
         return cmd
 

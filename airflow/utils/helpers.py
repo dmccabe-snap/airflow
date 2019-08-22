@@ -291,21 +291,29 @@ def reap_process_group(pid, log, sig=signal.SIGTERM,
     children = parent.children(recursive=True)
     children.append(parent)
 
-    try:
-        pg = os.getpgid(pid)
-    except OSError as err:
-        # Skip if not such process - we experience a race and it just terminated
-        if err.errno == errno.ESRCH:
-            return
-        raise
+    if os.name == "nt":
+        log.info("Sending %s to %d processes", sig, len(children))
+    else:
+        try:
+            pg = os.getpgid(pid)
+        except OSError as err:
+            # Skip if not such process - we experience a race and it just terminated
+            if err.errno == errno.ESRCH:
+                return
+            raise
 
-    log.info("Sending %s to GPID %s", sig, pg)
-    try:
-        os.killpg(os.getpgid(pid), sig)
-    except OSError as err:
-        if err.errno == errno.ESRCH:
-            return
-        raise
+        log.info("Sending %s to GPID %s", sig, pg)
+
+    if os.name == "nt":
+        for child in children:
+            child.terminate()
+    else:
+        try:
+            os.killpg(os.getpgid(pid), sig)
+        except OSError as err:
+            if err.errno == errno.ESRCH:
+                return
+            raise
 
     _, alive = psutil.wait_procs(children, timeout=timeout, callback=on_terminate)
 
@@ -313,12 +321,16 @@ def reap_process_group(pid, log, sig=signal.SIGTERM,
         for p in alive:
             log.warning("process %s (%s) did not respond to SIGTERM. Trying SIGKILL", p, pid)
 
-        try:
-            os.killpg(os.getpgid(pid), signal.SIGKILL)
-        except OSError as err:
-            if err.errno == errno.ESRCH:
-                return
-            raise
+        if os.name == "nt":
+            for child in alive:
+                child.kill()
+        else:
+            try:
+                os.killpg(os.getpgid(pid), signal.SIGKILL)
+            except OSError as err:
+                if err.errno == errno.ESRCH:
+                    return
+                raise
 
         gone, alive = psutil.wait_procs(alive, timeout=timeout, callback=on_terminate)
         if alive:

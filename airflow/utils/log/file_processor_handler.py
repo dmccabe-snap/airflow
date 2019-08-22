@@ -19,6 +19,7 @@
 
 import logging
 import os
+import sys
 
 from airflow import settings
 from airflow.utils.helpers import parse_template_string
@@ -123,8 +124,11 @@ class FileProcessorHandler(logging.Handler):
                 else:
                     os.symlink(log_directory, latest_log_directory_path)
             except OSError:
-                logging.warning("OSError while attempting to symlink "
-                                "the latest log directory")
+                # Windows Python usually doesn't have symlink access for normal users, so this is a very noisy warning.
+                # Fixed in Python 3.8 on Windows 10: https://bugs.python.org/issue31512
+                if os.name != "nt" or sys.hexversion >= 0x03080000:
+                    logging.warning("OSError while attempting to symlink "
+                                    "the latest log directory")
 
     def _init_file(self, filename):
         """

@@ -71,12 +71,19 @@ class FileTaskHandler(logging.Handler):
     def _render_filename(self, ti, try_number):
         if self.filename_jinja_template:
             jinja_context = ti.get_template_context()
+            if os.name == 'nt':
+                # Windows does not support colons in filenames
+                jinja_context['ts'] = jinja_context['ts_nodash']
             jinja_context['try_number'] = try_number
             return self.filename_jinja_template.render(**jinja_context)
 
+        execution_date_string = ti.execution_date.isoformat()
+        if os.name == 'nt':
+            # Windows does not support colons in filenames
+            execution_date_string = execution_date_string.replace('-', '').replace(':', '')
         return self.filename_template.format(dag_id=ti.dag_id,
                                              task_id=ti.task_id,
-                                             execution_date=ti.execution_date.isoformat(),
+                                             execution_date=execution_date_string,
                                              try_number=try_number)
 
     def _read(self, ti, try_number, metadata=None):

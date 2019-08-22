@@ -35,7 +35,8 @@ def tmp_configuration_copy(chmod=0o600, include_env=True, include_cmds=True):
 
     with os.fdopen(temp_fd, 'w') as temp_file:
         # Set the permissions before we write anything to it.
-        if chmod is not None:
+        # Windows does not have ``fchmod``, but the mode is not meaningful on NTFS anyway.
+        if chmod is not None and 'fchmod' in os.__dict__:
             os.fchmod(temp_fd, chmod)
         json.dump(cfg_dict, temp_file)
 
