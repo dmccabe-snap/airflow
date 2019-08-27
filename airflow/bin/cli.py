@@ -73,6 +73,8 @@ api_client = api_module.Client(api_base_url=conf.get('cli', 'endpoint_url'),
 
 log = LoggingMixin().log
 
+_TABLE_FORMAT = "fancy_grid" if os.name != "nt" else "grid"
+
 DAGS_FOLDER = settings.DAGS_FOLDER
 
 if "BUILDING_AIRFLOW_DOCS" in os.environ:
@@ -257,7 +259,7 @@ def delete_dag(args):
 
 def _tabulate_pools(pools):
     return "\n%s" % tabulate(pools, ['Pool', 'Slots', 'Description'],
-                             tablefmt="fancy_grid")
+                             tablefmt=_TABLE_FORMAT)
 
 
 def pool_list(args):
@@ -680,7 +682,7 @@ def list_jobs(args, dag=None):
         all_jobs = [[job.__getattribute__(field) for field in fields] for job in all_jobs]
         msg = tabulate(all_jobs,
                        [field.capitalize().replace('_', ' ') for field in fields],
-                       tablefmt="fancy_grid")
+                       tablefmt=_TABLE_FORMAT)
         print(msg)
 
 
@@ -1192,7 +1194,7 @@ def connections_list(args):
         conns = [map(reprlib.repr, conn) for conn in conns]
         msg = tabulate(conns, ['Conn Id', 'Conn Type', 'Host', 'Port',
                                'Is Encrypted', 'Is Extra Encrypted', 'Extra'],
-                       tablefmt="fancy_grid")
+                       tablefmt=_TABLE_FORMAT)
         print(msg)
 
 
@@ -1363,7 +1365,7 @@ def users_list(args):
     fields = ['id', 'username', 'email', 'first_name', 'last_name', 'roles']
     users = [[user.__getattribute__(field) for field in fields] for user in users]
     msg = tabulate(users, [field.capitalize().replace('_', ' ') for field in fields],
-                   tablefmt="fancy_grid")
+                   tablefmt=_TABLE_FORMAT)
     print(msg)
 
 
@@ -1567,7 +1569,7 @@ def roles_list(args):
     role_names = sorted([[r.name] for r in roles])
     msg = tabulate(role_names,
                    headers=['Role'],
-                   tablefmt="fancy_grid")
+                   tablefmt=_TABLE_FORMAT)
     print(msg)
 
 
