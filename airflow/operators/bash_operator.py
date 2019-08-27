@@ -125,7 +125,7 @@ class BashOperator(BaseOperator):
                     stderr=STDOUT,
                     cwd=tmp_dir,
                     env=env,
-                    preexec_fn=pre_exec)
+                    preexec_fn=pre_exec if os.name != 'nt' else None)
 
                 self.sub_process = sub_process
 
