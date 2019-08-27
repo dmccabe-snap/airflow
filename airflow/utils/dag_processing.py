@@ -306,9 +306,9 @@ def list_py_file_paths(directory, safe_mode=conf.getboolean('core', 'DAG_DISCOVE
         include_examples = conf.getboolean('core', 'LOAD_EXAMPLES')
     file_paths = []
     if directory is None:
-        return []
+        pass
     elif os.path.isfile(directory):
-        return [directory]
+        file_paths.append(directory)
     elif os.path.isdir(directory):
         patterns_by_dir = {}
         for root, dirs, files in os.walk(directory, followlinks=True):
