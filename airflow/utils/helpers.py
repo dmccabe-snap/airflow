@@ -306,7 +306,10 @@ def reap_process_group(pid, log, sig=signal.SIGTERM,
 
     if os.name == "nt":
         for child in children:
-            child.terminate()
+            try:
+                child.terminate()
+            except psutil.Error:
+                pass
     else:
         try:
             os.killpg(os.getpgid(pid), sig)

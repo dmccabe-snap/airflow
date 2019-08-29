@@ -20,6 +20,7 @@
 from base64 import b64encode
 from collections import OrderedDict
 import copy
+from io import BytesIO, TextIOWrapper
 import os
 import pathlib
 import shlex
@@ -76,8 +77,9 @@ def run_command(command):
         shlex.split(command),
         stdout=subprocess.PIPE,
         stderr=subprocess.PIPE,
-        close_fds=True)
-    output, stderr = [stream.decode(sys.getdefaultencoding(), 'ignore')
+        close_fds=True,
+        shell=(os.name == 'nt'))
+    output, stderr = [TextIOWrapper(BytesIO(stream), sys.getdefaultencoding(), 'ignore').read()
                       for stream in process.communicate()]
 
     if process.returncode != 0:

@@ -20,6 +20,7 @@
 """Example DAG demonstrating the usage of the BashOperator."""
 
 from datetime import timedelta
+import os
 
 import airflow
 from airflow.models import DAG
@@ -53,10 +54,14 @@ run_this = BashOperator(
 
 run_this >> run_this_last
 
+if os.name == 'nt':
+    bash_command = 'echo {{ task_instance_key_str }} && timeout 1'
+else:
+    bash_command = 'echo "{{ task_instance_key_str }}" && sleep 1'
 for i in range(3):
     task = BashOperator(
         task_id='runme_' + str(i),
-        bash_command='echo "{{ task_instance_key_str }}" && sleep 1',
+        bash_command=bash_command,
         dag=dag,
     )
     task >> run_this

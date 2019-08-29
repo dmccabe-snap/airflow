@@ -57,7 +57,7 @@ class timeout(LoggingMixin):
             # Windows does not have SIGALRM, so fake it with a thread and an async exception
             self._finished = False
             self._timeout_end = time.time() + self.seconds
-            self._main_thread_id = threading.get_ident()
+            self._main_thread_id = ctypes.pythonapi.PyThread_get_thread_ident()
             self._timeout_cv = threading.Condition()
             self._timeout_thread = threading.Thread(target=self._wait_for_timeout)
             self._timeout_thread.start()
@@ -81,7 +81,9 @@ class timeout(LoggingMixin):
                 time_remaining = self._timeout_end - time.time()
                 if time_remaining < 0:
                     self.log.error("Process timed out, PID: %s", str(os.getpid()))
-                    ctypes.pythonapi.PyThreadState_SetAsyncExc(
-                        self._main_thread_id, ctypes.py_object(AirflowTaskTimeout(self.error_message)))
+                    result = ctypes.pythonapi.PyThreadState_SetAsyncExc(
+                        self._main_thread_id, ctypes.py_object(AirflowTaskTimeout))
+                    if not result:
+                        self.log.error("Failed to raise exception for thread %d", self._main_thread_id)
                     break
                 self._timeout_cv.wait(time_remaining)

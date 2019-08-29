@@ -76,6 +76,7 @@ from airflow.utils.state import State
 from airflow.utils.timezone import datetime
 from airflow.hooks import hdfs_hook
 from tests.test_utils.config import conf_vars
+from tests.test_utils.db import clear_db_pools
 
 DEV_NULL = '/dev/null'
 TEST_DAG_FOLDER = os.path.join(
@@ -114,6 +115,7 @@ class TestCore(unittest.TestCase):
     default_scheduler_args = {"num_runs": 1}
 
     def setUp(self):
+        clear_db_pools()
         self.dagbag = DagBag(
             dag_folder=DEV_NULL, include_examples=True)
         self.args = {'owner': 'airflow', 'start_date': DEFAULT_DATE}
@@ -482,6 +484,7 @@ class TestCore(unittest.TestCase):
             output_encoding='utf-8')
         t.run(start_date=DEFAULT_DATE, end_date=DEFAULT_DATE, ignore_ti_state=True)
 
+    @unittest.skipIf(os.name == "nt", "bash_operator timeout not supported on Windows")
     def test_bash_operator_kill(self):
         import psutil
         sleep_time = "100%d" % os.getpid()
@@ -941,11 +944,11 @@ class TestCore(unittest.TestCase):
 
         p = BashOperator(
             task_id='pass_sleepy',
-            bash_command='sleep 3',
+            bash_command='timeout 3' if os.name == 'nt' else 'sleep 3',
             dag=self.dag)
         f = BashOperator(
             task_id='fail_sleepy',
-            bash_command='sleep 5',
+            bash_command='timeout 5' if os.name == 'nt' else 'sleep 5',
             execution_timeout=timedelta(seconds=3),
             retry_delay=timedelta(seconds=0),
             dag=self.dag)
@@ -978,8 +981,12 @@ class TestCore(unittest.TestCase):
 
         self.assertEqual(run_command("python -c '{0}'".format(cmd)), '\u1000foo')
 
-        self.assertEqual(run_command('echo "foo bar"'), 'foo bar\n')
-        self.assertRaises(AirflowConfigException, run_command, 'bash -c "exit 1"')
+        if os.name == "nt":
+            self.assertEqual(run_command('echo foo bar'), 'foo bar\n')
+            self.assertRaises(AirflowConfigException, run_command, 'cmd /c exit 1')
+        else:
+            self.assertEqual(run_command('echo "foo bar"'), 'foo bar\n')
+            self.assertRaises(AirflowConfigException, run_command, 'bash -c "exit 1"')
 
     def test_trigger_dagrun_with_execution_date(self):
         utc_now = timezone.utcnow()
@@ -2258,10 +2265,11 @@ class TestEmailSmtp(unittest.TestCase):
 
     @mock.patch('airflow.utils.email.send_MIME_email')
     def test_send_smtp(self, mock_send_mime):
-        attachment = tempfile.NamedTemporaryFile()
-        attachment.write(b'attachment')
-        attachment.seek(0)
-        utils.email.send_email_smtp('to', 'subject', 'content', files=[attachment.name])
+        with tempfile.TemporaryDirectory() as temp_dir:
+            attachment_name = os.path.join(temp_dir, "attachment")
+            with open(attachment_name, "wb") as attachment:
+                attachment.write(b'attachment')
+            utils.email.send_email_smtp('to', 'subject', 'content', files=[attachment_name])
         self.assertTrue(mock_send_mime.called)
         call_args = mock_send_mime.call_args[0]
         self.assertEqual(configuration.conf.get('smtp', 'SMTP_MAIL_FROM'), call_args[0])
@@ -2270,7 +2278,7 @@ class TestEmailSmtp(unittest.TestCase):
         self.assertEqual('subject', msg['Subject'])
         self.assertEqual(configuration.conf.get('smtp', 'SMTP_MAIL_FROM'), msg['From'])
         self.assertEqual(2, len(msg.get_payload()))
-        filename = 'attachment; filename="' + os.path.basename(attachment.name) + '"'
+        filename = 'attachment; filename="' + os.path.basename(attachment_name) + '"'
         self.assertEqual(filename, msg.get_payload()[-1].get('Content-Disposition'))
         mimeapp = MIMEApplication('attachment')
         self.assertEqual(mimeapp.get_payload(), msg.get_payload()[-1].get_payload())
@@ -2286,10 +2294,11 @@ class TestEmailSmtp(unittest.TestCase):
 
     @mock.patch('airflow.utils.email.send_MIME_email')
     def test_send_bcc_smtp(self, mock_send_mime):
-        attachment = tempfile.NamedTemporaryFile()
-        attachment.write(b'attachment')
-        attachment.seek(0)
-        utils.email.send_email_smtp('to', 'subject', 'content', files=[attachment.name], cc='cc', bcc='bcc')
+        with tempfile.TemporaryDirectory() as temp_dir:
+            attachment_name = os.path.join(temp_dir, "attachment")
+            with open(attachment_name, "wb") as attachment:
+                attachment.write(b'attachment')
+            utils.email.send_email_smtp('to', 'subject', 'content', files=[attachment_name], cc='cc', bcc='bcc')
         self.assertTrue(mock_send_mime.called)
         call_args = mock_send_mime.call_args[0]
         self.assertEqual(configuration.conf.get('smtp', 'SMTP_MAIL_FROM'), call_args[0])
@@ -2298,7 +2307,7 @@ class TestEmailSmtp(unittest.TestCase):
         self.assertEqual('subject', msg['Subject'])
         self.assertEqual(configuration.conf.get('smtp', 'SMTP_MAIL_FROM'), msg['From'])
         self.assertEqual(2, len(msg.get_payload()))
-        self.assertEqual('attachment; filename="' + os.path.basename(attachment.name) + '"',
+        self.assertEqual('attachment; filename="' + os.path.basename(attachment_name) + '"',
                          msg.get_payload()[-1].get('Content-Disposition'))
         mimeapp = MIMEApplication('attachment')
         self.assertEqual(mimeapp.get_payload(), msg.get_payload()[-1].get_payload())
